@@ -52,6 +52,11 @@ type Model struct {
 	previewRaw  []byte         // 预览区当前展示的原始内容（判断是否全部可见）
 	previewPath string         // 预览区当前展示的文件路径（用于判断是否需重载）
 
+	// highlightCache 缓存语法高亮结果（键为文件路径）。
+	// 翻列表来回切换文件时，同一文件不再重复分词渲染，保证零延迟；容量见
+	// highlightPreview 的清理策略。
+	highlightCache map[string]highlightCacheEntry
+
 	width  int // 终端宽度（WindowSizeMsg 提供）
 	height int // 终端高度
 	listW  int // 左侧列表栏宽度（含边框）
@@ -67,10 +72,11 @@ type Model struct {
 // entries 由 backup.List 提供；basePath 为目标文件绝对路径。
 func New(basePath string, entries []backup.Entry) *Model {
 	m := &Model{
-		basePath: basePath,
-		baseName: filepath.Base(basePath),
-		entries:  entries,
-		preview:  viewport.New(0, 0),
+		basePath:       basePath,
+		baseName:       filepath.Base(basePath),
+		entries:        entries,
+		preview:        viewport.New(0, 0),
+		highlightCache: make(map[string]highlightCacheEntry),
 	}
 	// 预览区的滚动完全由本模型驱动（见 update.go），不使用 viewport 自带键位。
 	m.preview.KeyMap = viewport.KeyMap{}

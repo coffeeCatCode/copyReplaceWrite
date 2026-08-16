@@ -219,7 +219,8 @@ func (m *Model) loadPreview() {
 	if isBinary(data) {
 		m.preview.SetContent("（二进制文件，无法预览）")
 	} else {
-		m.preview.SetContent(string(data))
+		// 常规文本：按文件名做语法高亮（带结果缓存，识别不到语言时原样渲染）。
+		m.preview.SetContent(m.highlightPreview(e, data))
 	}
 	m.preview.GotoTop()
 }
