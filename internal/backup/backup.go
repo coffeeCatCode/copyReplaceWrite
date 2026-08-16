@@ -107,7 +107,7 @@ func UniqueBackupPath(basePath string, t time.Time) (string, error) {
 	baseName := filepath.Base(basePath)
 	ts := t.Format(timeLayout)
 
-	for i := 0; i < 10000; i++ {
+	for i := range 10000 {
 		var candidate string
 		if i == 0 {
 			candidate = filepath.Join(dir, BackupName(baseName, t))
