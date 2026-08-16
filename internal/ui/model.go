@@ -43,6 +43,11 @@ type Model struct {
 	focus    focus          // 当前焦点面板
 	mode     mode           // 交互模式
 
+	// 对比模式（F1 切换）：进入时把当前选中项记为母本 compareBase，
+	// 此后预览区渲染“选中项 vs 母本”的行级 diff，其余操作保持不变。
+	compareMode bool         // 是否处于对比模式
+	compareBase backup.Entry // 对比母本（进入对比模式时选中的文件）
+
 	preview     viewport.Model // 预览区滚动视图
 	previewRaw  []byte         // 预览区当前展示的原始内容（判断是否全部可见）
 	previewPath string         // 预览区当前展示的文件路径（用于判断是否需重载）

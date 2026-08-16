@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"crw/internal/backup"
@@ -157,6 +158,13 @@ func (m *Model) performDelete(e backup.Entry) {
 		m.setError(err.Error())
 		return
 	}
+	// 若被删除的正是对比母本，对比失去参照，自动退出对比模式。
+	if m.compareMode && e.Path == m.compareBase.Path {
+		m.compareMode = false
+		m.refresh()
+		m.setStatus("母本 " + e.Name + " 已删除，已退出对比模式")
+		return
+	}
 	m.refresh()
 	m.setStatus("已删除 " + e.Name)
 }
@@ -188,10 +196,15 @@ func (m *Model) refresh() {
 }
 
 // loadPreview 读取并渲染当前选中条目的预览内容（滚动位置重置到顶部）。
+// 对比模式下改由 loadDiffPreview 渲染与母本的差异。
 // 二进制文件（前 8KB 内出现 NUL 字节）不渲染原始内容，显示占位提示。
 func (m *Model) loadPreview() {
 	if len(m.entries) == 0 {
 		m.preview.SetContent("")
+		return
+	}
+	if m.compareMode {
+		m.loadDiffPreview()
 		return
 	}
 	e := m.entries[m.cursor]
@@ -209,6 +222,107 @@ func (m *Model) loadPreview() {
 		m.preview.SetContent(string(data))
 	}
 	m.preview.GotoTop()
+}
+
+// toggleCompare 切换对比模式（F1 键）。
+// 进入：把当前选中项记为母本，预览立即切换到对比视图；
+// 退出：恢复常规内容预览。两种模式下其余操作（选择/替换/克隆/删除/刷新）语义不变。
+func (m *Model) toggleCompare() {
+	if len(m.entries) == 0 {
+		return
+	}
+	if m.compareMode {
+		m.compareMode = false
+		m.setStatus("已退出对比模式")
+	} else {
+		m.compareMode = true
+		m.compareBase = m.entries[m.cursor]
+		m.setStatus("对比模式：母本为 " + m.compareBase.Name + "，切换文件查看与母本的差异")
+	}
+	m.loadPreview()
+}
+
+// loadDiffPreview 在对比模式下渲染选中项与母本的行级差异。
+// 母本或当前文件已被外部删除时无法对比，显示占位提示（不崩溃）。
+func (m *Model) loadDiffPreview() {
+	cur := m.entries[m.cursor]
+
+	// 文件存在性检查：缺失时展示提示而非视为“空文件”参与 diff。
+	if _, err := os.Stat(m.compareBase.Path); err != nil {
+		m.preview.SetContent("（母本文件已不存在，无法对比；按 F1 退出对比模式）")
+		m.previewRaw = []byte("（母本文件已不存在，无法对比；按 F1 退出对比模式）")
+		m.preview.GotoTop()
+		return
+	}
+	if _, err := os.Stat(cur.Path); err != nil {
+		m.preview.SetContent("（当前选中文件已不存在，无法对比）")
+		m.previewRaw = []byte("（当前选中文件已不存在，无法对比）")
+		m.preview.GotoTop()
+		return
+	}
+
+	baseData, err := backup.ReadContent(m.compareBase.Path)
+	if err != nil {
+		m.setError("读取母本失败: " + err.Error())
+		m.preview.SetContent("")
+		return
+	}
+	curData, err := backup.ReadContent(cur.Path)
+	if err != nil {
+		m.setError("读取对比文件失败: " + err.Error())
+		m.preview.SetContent("")
+		return
+	}
+	m.previewPath = cur.Path
+	if isBinary(baseData) || isBinary(curData) {
+		m.previewRaw = []byte("（二进制文件，无法对比）")
+		m.preview.SetContent(string(m.previewRaw))
+	} else {
+		m.renderDiff(baseData, curData)
+	}
+	m.preview.GotoTop()
+}
+
+// renderDiff 计算母本 → 当前文件的差异并渲染到预览区。
+// 渲染结构：首行统计（+新增 / -删除 行数），随后按顺序逐行着色：
+// 上下文灰色、新增绿色（前缀 +）、删除红色（前缀 -），行首带各自行号。
+// previewRaw 保存渲染文本，供 previewFits 判断是否全部可见。
+func (m *Model) renderDiff(baseData, curData []byte) {
+	lines := backup.Diff(baseData, curData)
+
+	var adds, dels int
+	for _, l := range lines {
+		switch l.Kind {
+		case backup.DiffAdded:
+			adds++
+		case backup.DiffRemoved:
+			dels++
+		}
+	}
+
+	var sb strings.Builder
+	if adds == 0 && dels == 0 {
+		sb.WriteString(diffHeadStyle.Render("（内容完全相同，无差异；切换其他文件查看）"))
+	} else {
+		sb.WriteString(diffHeadStyle.Render(fmt.Sprintf("对比 %s：+%d 行 / -%d 行", filepath.Base(m.compareBase.Path), adds, dels)))
+	}
+	for _, l := range lines {
+		line := ""
+		switch l.Kind {
+		case backup.DiffContext:
+			line = diffCtxStyle.Render(fmt.Sprintf(" %4d | %s", l.NumA, l.Text))
+		case backup.DiffAdded:
+			line = diffAddStyle.Render(fmt.Sprintf("+%4d | %s", l.NumB, l.Text))
+		case backup.DiffRemoved:
+			line = diffDelStyle.Render(fmt.Sprintf("-%4d | %s", l.NumA, l.Text))
+		}
+		sb.WriteString("\n")
+		sb.WriteString(line)
+	}
+
+	text := sb.String()
+	m.previewRaw = []byte(text)
+	m.preview.SetContent(text)
 }
 
 // isBinary 粗略判断内容是否包含二进制数据：仅检查前 8KB 是否出现 NUL 字节。

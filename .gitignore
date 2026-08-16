@@ -4,3 +4,4 @@
 # 代理/编辑器工具状态（可随时按需纳入版本管理）
 /.hermes/
 /.serena/
+/.codegraph/

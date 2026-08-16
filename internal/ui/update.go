@@ -31,6 +31,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 //	            Ctrl+D/Ctrl+U/PgDn/PgUp 滚动预览
 //	全局操作：  Enter 用选中备份替换当前文件；c 克隆当前内容为备份；
 //	            d 删除（需确认）；D 直接删除；r 重新扫描目录；
+//	            F1 切换对比模式（进入时当前选中项为母本）；
 //	            q/Ctrl+C/Esc 退出
 func (m *Model) handleKey(msg tea.KeyMsg) bool {
 	// 删除确认框优先拦截按键。
@@ -41,6 +42,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) bool {
 	switch msg.String() {
 	case "q", "ctrl+c", "esc":
 		return true
+
+	case "f1":
+		// 切换对比模式；进入/退出都不影响其余操作语义。
+		m.toggleCompare()
 
 	case "tab":
 		// Tab 在列表与预览之间来回切换。

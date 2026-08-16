@@ -3,6 +3,7 @@ package ui
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -28,6 +29,11 @@ var (
 	helpStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
 	confirmBoxStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("9")).Padding(0, 2)
 	previewTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("75"))
+	// 对比模式（F1）渲染样式：标题黄色、新增绿、删除红、上下文灰。
+	diffHeadStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11"))
+	diffAddStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	diffDelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	diffCtxStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
 )
 
 // View 渲染整个界面：标题栏 + 双栏主体 + 状态/快捷键栏。
@@ -98,18 +104,31 @@ func (m *Model) listRow(i int, e backup.Entry, contentW int) string {
 }
 
 // previewView 渲染右侧预览面板：标题行（文件名 + 滚动百分比）+ 分隔线 + 内容。
+// 对比模式下标题追加“ ⟷ 母本文件名”标识，提示当前展示的是差异视图。
 func (m *Model) previewView() string {
 	title := ""
 	if m.cursor >= 0 && m.cursor < len(m.entries) {
 		e := m.entries[m.cursor]
 		name := truncate(e.Name, m.preview.Width)
-		// ScrollPercent() 返回 0~1 小数，需乘 100 才是百分比；
-		// 内容完全可见时不显示百分比（避免误导为"已滚到底"）。
-		pct := ""
-		if !m.previewFits() {
-			pct = fmt.Sprintf("  [%d%%]", int(m.preview.ScrollPercent()*100))
+		if m.compareMode {
+			// 对比模式：黄字标题，说明当前对象与母本的对比关系。
+			name = truncate(e.Name+" ⟷ "+filepath.Base(m.compareBase.Path), m.preview.Width)
+			// ScrollPercent() 返回 0~1 小数，需乘 100 才是百分比；
+			// 内容完全可见时不显示百分比（避免误导为"已滚到底"）。
+			pct := ""
+			if !m.previewFits() {
+				pct = fmt.Sprintf("  [%d%%]", int(m.preview.ScrollPercent()*100))
+			}
+			title = diffHeadStyle.Render(name + pct)
+		} else {
+			// ScrollPercent() 返回 0~1 小数，需乘 100 才是百分比；
+			// 内容完全可见时不显示百分比（避免误导为"已滚到底"）。
+			pct := ""
+			if !m.previewFits() {
+				pct = fmt.Sprintf("  [%d%%]", int(m.preview.ScrollPercent()*100))
+			}
+			title = previewTitleStyle.Render(name + pct)
 		}
-		title = previewTitleStyle.Render(name + pct)
 	}
 	divider := strings.Repeat("─", m.preview.Width)
 	content := title + "\n" + divider + "\n" + m.preview.View()
@@ -161,7 +180,7 @@ func (m *Model) footerView() string {
 	}
 	statusLine := statusStyle.Width(m.width).Render(status)
 
-	help := "j/k 选择  Tab 切换预览  j/k 滚动  Enter 替换  c 复制  d 删除(确认)  D 强删  r 刷新  q 退出"
+	help := "j/k 选择/滚动  Tab/←/→ 焦点  F1 对比  Enter 替换  c 复制  d/D 删除  r 刷新  q 退出"
 	helpLine := helpStyle.Width(m.width).Render(truncate(help, m.width))
 	return statusLine + "\n" + helpLine
 }
