@@ -106,6 +106,17 @@ func (m *Model) handleKey(msg tea.KeyMsg) bool {
 	case " ":
 		// 空格：在母本（目标文件本身）与上次位置之间来回跳转。
 		m.jumpToBaseOrBack()
+	case "s":
+		// s：对比模式下切换显示方式（全文 ↔ hunk），仅对比模式生效。
+		if m.compareMode {
+			m.hunkOnly = !m.hunkOnly
+			if m.hunkOnly {
+				m.setStatus("hunk 显示：仅显示变更块及上下文（s 切回全文）")
+			} else {
+				m.setStatus("全文显示：显示完整差异")
+			}
+			m.loadPreview()
+		}
 	}
 	return false
 }

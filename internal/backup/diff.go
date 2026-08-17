@@ -17,6 +17,9 @@ const (
 	DiffAdded
 	// DiffRemoved 表示仅存在于 a（母本）的行，即被删除/修改前的行。
 	DiffRemoved
+	// DiffHunkGap 表示 hunk 视图（DiffHunks）中被折叠的相同内容区间，
+	// 不出现在完整 Diff 的输出中。其 NumA 记录被折叠的上下文行数。
+	DiffHunkGap
 )
 
 // DiffLine 表示 diff 结果中的一行。
@@ -25,6 +28,76 @@ type DiffLine struct {
 	Text string   // 行文本（不含行尾换行符；行尾 \r 已剥离，使 CRLF 与 LF 文件可比）
 	NumA int      // 该行在 a（母本）中的 1 起始行号；Added 行为 0
 	NumB int      // 该行在 b（当前文件）中的 1 起始行号；Removed 行为 0
+}
+
+// DefaultHunkContext 是 hunk 视图默认保留的上下文行数（与 git diff 一致）。
+const DefaultHunkContext = 3
+
+// DiffHunks 把完整 Diff 输出压缩为 hunk 视图：每个变更块（Added/Removed 行）
+// 前后保留 ctx 行上下文，其余相同内容折叠为 DiffHunkGap 标记行。
+//
+// 语义与 git diff 一致：文件头尾的相同部分直接丢弃（不产生 gap），
+// 变更块之间的相同内容折叠为一条 gap，gap 的 NumA 记录折叠行数。
+// 输入无任何变更行时返回 nil；ctx < 0 按 0 处理。
+// 空间复杂度 O(n)（布尔标记数组），时间 O(n)。
+func DiffHunks(lines []DiffLine, ctx int) []DiffLine {
+	if ctx < 0 {
+		ctx = 0
+	}
+	n := len(lines)
+	changed := make([]bool, n)
+	any := false
+	for i, l := range lines {
+		if l.Kind == DiffAdded || l.Kind == DiffRemoved {
+			changed[i] = true
+			any = true
+		}
+	}
+	if !any {
+		return nil
+	}
+	// keep[i] = 该行是否为变更行或落在某变更行前后 ctx 行上下文内。
+	keep := make([]bool, n)
+	// 正向：变更行向后扩展 ctx 行。
+	run := 0
+	for i := 0; i < n; i++ {
+		if changed[i] {
+			run = ctx
+			keep[i] = true
+		} else if run > 0 {
+			keep[i] = true
+			run--
+		}
+	}
+	// 反向：变更行向前扩展 ctx 行。
+	run = 0
+	for i := n - 1; i >= 0; i-- {
+		if changed[i] {
+			run = ctx
+			keep[i] = true
+		} else if run > 0 {
+			keep[i] = true
+			run--
+		}
+	}
+
+	// 折叠：keep 行保留；连续非 keep 行合并为一条 gap（头尾的非 keep 段丢弃）。
+	out := make([]DiffLine, 0, n)
+	gap := 0
+	seen := false
+	for i := 0; i < n; i++ {
+		if keep[i] {
+			if gap > 0 && seen {
+				out = append(out, DiffLine{Kind: DiffHunkGap, NumA: gap})
+			}
+			gap = 0
+			seen = true
+			out = append(out, lines[i])
+		} else {
+			gap++
+		}
+	}
+	return out
 }
 
 // SplitLines 将文件内容拆成行列表。

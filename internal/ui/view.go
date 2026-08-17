@@ -34,6 +34,7 @@ var (
 	diffAddStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	diffDelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 	diffCtxStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	diffGapStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Italic(true)
 )
 
 // View 渲染整个界面：标题栏 + 双栏主体 + 状态/快捷键栏。
@@ -180,7 +181,7 @@ func (m *Model) footerView() string {
 	}
 	statusLine := statusStyle.Width(m.width).Render(status)
 
-	help := "j/k 选择/滚动  Tab/←/→ 焦点  Space 母本/返回  F1 对比  Enter 替换  c 复制  d/D 删除  r 刷新  q 退出"
+	help := "j/k 选择/滚动  Tab/←/→ 焦点  Space 母本/返回  F1 对比  s 全文/hunk  Enter 替换  c 复制  d/D 删除  r 刷新  q 退出"
 	helpLine := helpStyle.Width(m.width).Render(truncate(help, m.width))
 	return statusLine + "\n" + helpLine
 }

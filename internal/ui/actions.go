@@ -324,12 +324,14 @@ func (m *Model) loadDiffPreview() {
 // renderDiff 计算母本 → 当前文件的差异并渲染到预览区。
 // 渲染结构：首行统计（+新增 / -删除 行数），随后按顺序逐行着色：
 // 上下文灰色、新增绿色（前缀 +）、删除红色（前缀 -），行首带各自行号。
+// hunk 显示模式（s 键）下先经 backup.DiffHunks 折叠相同内容，
+// 折叠处显示省略标记行。
 // previewRaw 保存渲染文本，供 previewFits 判断是否全部可见。
 func (m *Model) renderDiff(baseData, curData []byte) {
-	lines := backup.Diff(baseData, curData)
+	full := backup.Diff(baseData, curData)
 
 	var adds, dels int
-	for _, l := range lines {
+	for _, l := range full {
 		switch l.Kind {
 		case backup.DiffAdded:
 			adds++
@@ -342,20 +344,30 @@ func (m *Model) renderDiff(baseData, curData []byte) {
 	if adds == 0 && dels == 0 {
 		sb.WriteString(diffHeadStyle.Render("（内容完全相同，无差异；切换其他文件查看）"))
 	} else {
-		sb.WriteString(diffHeadStyle.Render(fmt.Sprintf("对比 %s：+%d 行 / -%d 行", filepath.Base(m.compareBase.Path), adds, dels)))
-	}
-	for _, l := range lines {
-		line := ""
-		switch l.Kind {
-		case backup.DiffContext:
-			line = diffCtxStyle.Render(fmt.Sprintf(" %4d | %s", l.NumA, l.Text))
-		case backup.DiffAdded:
-			line = diffAddStyle.Render(fmt.Sprintf("+%4d | %s", l.NumB, l.Text))
-		case backup.DiffRemoved:
-			line = diffDelStyle.Render(fmt.Sprintf("-%4d | %s", l.NumA, l.Text))
+		mode := "全文"
+		lines := full
+		if m.hunkOnly {
+			lines = backup.DiffHunks(full, backup.DefaultHunkContext)
+			mode = "hunk"
 		}
-		sb.WriteString("\n")
-		sb.WriteString(line)
+		sb.WriteString(diffHeadStyle.Render(fmt.Sprintf(
+			"对比 %s：+%d 行 / -%d 行 [%s]",
+			filepath.Base(m.compareBase.Path), adds, dels, mode)))
+		for _, l := range lines {
+			line := ""
+			switch l.Kind {
+			case backup.DiffContext:
+				line = diffCtxStyle.Render(fmt.Sprintf(" %4d | %s", l.NumA, l.Text))
+			case backup.DiffAdded:
+				line = diffAddStyle.Render(fmt.Sprintf("+%4d | %s", l.NumB, l.Text))
+			case backup.DiffRemoved:
+				line = diffDelStyle.Render(fmt.Sprintf("-%4d | %s", l.NumA, l.Text))
+			case backup.DiffHunkGap:
+				line = diffGapStyle.Render(fmt.Sprintf("       ⋮ 省略 %d 行相同内容", l.NumA))
+			}
+			sb.WriteString("\n")
+			sb.WriteString(line)
+		}
 	}
 
 	text := sb.String()

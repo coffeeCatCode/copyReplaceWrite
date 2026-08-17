@@ -47,6 +47,9 @@ type Model struct {
 	// 此后预览区渲染“选中项 vs 母本”的行级 diff，其余操作保持不变。
 	compareMode bool         // 是否处于对比模式
 	compareBase backup.Entry // 对比母本（进入对比模式时选中的文件）
+	// hunkOnly 对比模式下的显示方式（s 键切换）：true 时仅显示变更块及
+	// 上下少量上下文（git diff 风格），false 时全文显示（默认）。
+	hunkOnly bool
 
 	// lastPosPath 记录按空格跳到母本前光标所在条目的路径；
 	// 再次按空格时若仍在母本位置则跳回该条目。为空表示无待返回位置。
