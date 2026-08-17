@@ -103,6 +103,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) bool {
 		m.askDelete(false)
 	case "r":
 		m.refresh()
+	case " ":
+		// 空格：在母本（目标文件本身）与上次位置之间来回跳转。
+		m.jumpToBaseOrBack()
 	}
 	return false
 }

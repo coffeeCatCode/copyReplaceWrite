@@ -180,7 +180,7 @@ func (m *Model) footerView() string {
 	}
 	statusLine := statusStyle.Width(m.width).Render(status)
 
-	help := "j/k 选择/滚动  Tab/←/→ 焦点  F1 对比  Enter 替换  c 复制  d/D 删除  r 刷新  q 退出"
+	help := "j/k 选择/滚动  Tab/←/→ 焦点  Space 母本/返回  F1 对比  Enter 替换  c 复制  d/D 删除  r 刷新  q 退出"
 	helpLine := helpStyle.Width(m.width).Render(truncate(help, m.width))
 	return statusLine + "\n" + helpLine
 }

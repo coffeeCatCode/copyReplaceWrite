@@ -26,6 +26,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "  打开同目录下 <文件名> 及其全部 <文件名>.* 备份文件的版本列表。\n")
 	fmt.Fprintf(os.Stderr, "  回车: 用选中备份的内容替换当前文件（原内容自动备份，除非已存在相同备份）\n")
 	fmt.Fprintf(os.Stderr, "  F1:   切换对比模式（进入时当前选中项为母本，预览显示与母本的差异）\n")
+	fmt.Fprintf(os.Stderr, "  空格: 跳到目标文件本身（母本）；再按一次返回原位置\n")
 	fmt.Fprintf(os.Stderr, "  c:    把当前文件内容克隆为一份新备份\n")
 	fmt.Fprintf(os.Stderr, "  d/D:  删除选中的备份（d 需确认，D 直接删）\n")
 }

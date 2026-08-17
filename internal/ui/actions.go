@@ -243,6 +243,43 @@ func (m *Model) toggleCompare() {
 	m.loadPreview()
 }
 
+// jumpToBaseOrBack 实现空格键：在母本（目标文件本身）与上次位置之间跳转。
+//
+// 光标不在母本条目时，记住当前条目路径并跳到母本；已在母本条目时，
+// 跳回记住的位置。跳到母本后又移动过光标，再次按空格仍会跳回母本
+// （因为此刻光标不在母本），语义保持对称，配合 F1 对比模式使用：
+// 先跳到母本按 F1 设其为对比母本，再按空格回到原文件查看差异。
+func (m *Model) jumpToBaseOrBack() {
+	if len(m.entries) == 0 {
+		return
+	}
+	baseIdx := indexOfBase(m.entries)
+	if baseIdx < 0 {
+		m.setError("目标文件本身不存在，无法跳转")
+		return
+	}
+	if m.cursor != baseIdx {
+		// 不在母本：记住当前位置，跳到母本。
+		m.lastPosPath = m.entries[m.cursor].Path
+		m.moveCursorTo(baseIdx)
+		m.setStatus("已跳到母本，再按空格返回 " + m.entries[m.cursor].Name)
+		return
+	}
+	// 已在母本：跳回记住的位置。
+	if m.lastPosPath == "" {
+		m.setStatus("没有可返回的上次位置")
+		return
+	}
+	idx := indexOfPath(m.entries, m.lastPosPath)
+	m.lastPosPath = ""
+	if idx < 0 {
+		m.setError("上次位置的文件已不存在")
+		return
+	}
+	m.moveCursorTo(idx)
+	m.setStatus("已返回 " + m.entries[idx].Name)
+}
+
 // loadDiffPreview 在对比模式下渲染选中项与母本的行级差异。
 // 母本或当前文件已被外部删除时无法对比，显示占位提示（不崩溃）。
 func (m *Model) loadDiffPreview() {
@@ -339,6 +376,16 @@ func isBinary(data []byte) bool {
 func indexOfPath(entries []backup.Entry, target string) int {
 	for i, e := range entries {
 		if e.Path == target {
+			return i
+		}
+	}
+	return -1
+}
+
+// indexOfBase 返回 entries 中目标文件本身（IsBase）的索引；不存在返回 -1。
+func indexOfBase(entries []backup.Entry) int {
+	for i, e := range entries {
+		if e.IsBase {
 			return i
 		}
 	}

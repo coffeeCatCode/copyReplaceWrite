@@ -48,6 +48,10 @@ type Model struct {
 	compareMode bool         // 是否处于对比模式
 	compareBase backup.Entry // 对比母本（进入对比模式时选中的文件）
 
+	// lastPosPath 记录按空格跳到母本前光标所在条目的路径；
+	// 再次按空格时若仍在母本位置则跳回该条目。为空表示无待返回位置。
+	lastPosPath string
+
 	preview     viewport.Model // 预览区滚动视图
 	previewRaw  []byte         // 预览区当前展示的原始内容（判断是否全部可见）
 	previewPath string         // 预览区当前展示的文件路径（用于判断是否需重载）
