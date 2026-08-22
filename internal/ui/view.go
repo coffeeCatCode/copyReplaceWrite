@@ -166,7 +166,10 @@ func (m *Model) confirmBoxView() string {
 	if left < 0 {
 		left = 0
 	}
-	return strings.Repeat("\n", top) + strings.Repeat(" ", left) + box
+	// box 是多行字符串，逐行加左侧偏移，否则换行后的行会贴到最左边。
+	indent := strings.Repeat(" ", left)
+	box = indent + strings.ReplaceAll(box, "\n", "\n"+indent)
+	return strings.Repeat("\n", top) + box
 }
 
 // footerView 渲染底部两行：状态消息 + 快捷键提示。
